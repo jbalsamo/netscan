@@ -14,9 +14,17 @@ pub struct Cli {
     #[arg(short, long, default_value_t = 500)]
     pub timeout: u64,
 
-    /// Maximum concurrent TCP connection attempts
+    /// Maximum concurrent connection attempts
     #[arg(short, long, default_value_t = 1000)]
     pub concurrency: usize,
+
+    /// Output format (text, json, csv)
+    #[arg(short, long, default_value = "text")]
+    pub format: String,
+
+    /// Protocol to scan (tcp, udp, both)
+    #[arg(short, long, default_value = "tcp")]
+    pub protocol: String,
 }
 
 pub fn parse_ports(ports_str: &str) -> Result<Vec<u16>, String> {
