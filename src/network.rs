@@ -2,6 +2,15 @@ use ipnet::IpNet;
 use std::net::IpAddr;
 use std::str::FromStr;
 
+pub async fn lookup_hostname(ip: IpAddr) -> Option<String> {
+    tokio::task::spawn_blocking(move || {
+        dns_lookup::lookup_addr(&ip).ok()
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 pub fn parse_subnet(cidr: &str) -> Result<Vec<IpAddr>, String> {
     let net = IpNet::from_str(cidr).map_err(|e| format!("Invalid CIDR subnet '{}': {}", cidr, e))?;
 

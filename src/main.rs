@@ -48,7 +48,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if result.is_open {
                 open_ports_count += 1;
                 discovered_hosts.insert(result.ip);
-                println!("[+] {}:{} - OPEN", result.ip, result.port);
+
+                let host_display = match &result.hostname {
+                    Some(h) if h != &result.ip.to_string() => format!(" ({})", h),
+                    _ => "".to_string(),
+                };
+                let banner_display = match &result.banner {
+                    Some(b) => format!(" | Banner: {}", b),
+                    None => "".to_string(),
+                };
+
+                println!(
+                    "[+] {}{}:{} - OPEN{}",
+                    result.ip, host_display, result.port, banner_display
+                );
             }
         }
     }

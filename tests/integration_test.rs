@@ -1,5 +1,5 @@
 use netscan::cli::parse_ports;
-use netscan::network::parse_subnet;
+use netscan::network::{parse_subnet, lookup_hostname};
 use netscan::scanner::scan_port;
 use std::sync::Arc;
 use std::time::Duration;
@@ -61,4 +61,37 @@ async fn test_scanner_open_port() {
     assert_eq!(scan_result.port, port);
 
     let _ = handle.await;
+}
+
+#[tokio::test]
+async fn test_banner_grabbing() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let port = addr.port();
+    let ip = addr.ip();
+    let semaphore = Arc::new(Semaphore::new(10));
+    let timeout = Duration::from_millis(500);
+
+    let handle = tokio::spawn(async move {
+        if let Ok((mut socket, _)) = listener.accept().await {
+            use tokio::io::AsyncWriteExt;
+            let _ = socket.write_all(b"SSH-2.0-OpenSSH_8.9p1\r\n").await;
+        }
+    });
+
+    let res = scan_port(ip, port, timeout, semaphore).await;
+    assert!(res.is_some());
+    let scan_result = res.unwrap();
+    assert!(scan_result.is_open);
+    assert_eq!(scan_result.banner, Some("SSH-2.0-OpenSSH_8.9p1".to_string()));
+
+    let _ = handle.await;
+}
+
+#[tokio::test]
+async fn test_reverse_dns() {
+    let ip = "127.0.0.1".parse().unwrap();
+    let _hostname = lookup_hostname(ip).await;
+    // Just verify it doesn't panic
+    assert!(true);
 }
