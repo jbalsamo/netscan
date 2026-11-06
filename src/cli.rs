@@ -25,6 +25,14 @@ pub struct Cli {
     /// Protocol to scan (tcp, udp, both)
     #[arg(short, long, default_value = "tcp")]
     pub protocol: String,
+
+    /// Randomize scan target/port order (Stealth mode)
+    #[arg(long, default_value_t = false)]
+    pub randomize: bool,
+
+    /// Add random delay jitter (ms) between requests (Stealth mode)
+    #[arg(long, default_value_t = 0)]
+    pub jitter: u64,
 }
 
 pub fn parse_ports(ports_str: &str) -> Result<Vec<u16>, String> {

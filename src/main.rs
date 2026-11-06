@@ -3,6 +3,8 @@ use netscan::cli::{parse_ports, Cli};
 use netscan::network::parse_subnet;
 use netscan::scanner::{scan_port, scan_udp_port, ScanResult};
 
+use rand::seq::SliceRandom;
+use rand::Rng;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Semaphore;
@@ -19,10 +21,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if args.format == "text" {
         println!(
-            "[*] Starting netscan on {} hosts across {} ports [Protocol: {}, Timeout: {}ms, Concurrency: {}]",
+            "[*] Starting netscan on {} hosts across {} ports [Protocol: {}, Randomize: {}, Jitter: {}ms, Timeout: {}ms, Concurrency: {}]",
             ips.len(),
             ports.len(),
             args.protocol,
+            args.randomize,
+            args.jitter,
             args.timeout,
             args.concurrency
         );
@@ -33,28 +37,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let start_time = Instant::now();
 
-    let mut set = tokio::task::JoinSet::new();
-
+    let mut scan_tasks = Vec::new();
     for ip in &ips {
         let ip = *ip;
         for &port in &ports {
-            let sem = Arc::clone(&semaphore);
-            let timeout_dur = timeout_duration;
-
             if scan_tcp {
-                let sem_tcp = Arc::clone(&sem);
-                set.spawn(async move {
-                    scan_port(ip, port, timeout_dur, sem_tcp).await
-                });
+                scan_tasks.push((ip, port, "TCP"));
             }
-
             if scan_udp {
-                let sem_udp = Arc::clone(&sem);
-                set.spawn(async move {
-                    scan_udp_port(ip, port, timeout_dur, sem_udp).await
-                });
+                scan_tasks.push((ip, port, "UDP"));
             }
         }
+    }
+
+    if args.randomize {
+        let mut rng = rand::thread_rng();
+        scan_tasks.shuffle(&mut rng);
+    }
+
+    let mut set = tokio::task::JoinSet::new();
+
+    for (ip, port, proto) in scan_tasks {
+        let sem = Arc::clone(&semaphore);
+        let timeout_dur = timeout_duration;
+        let jitter = args.jitter;
+
+        set.spawn(async move {
+            if jitter > 0 {
+                let sleep_ms = rand::thread_rng().gen_range(0..=jitter);
+                if sleep_ms > 0 {
+                    tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
+                }
+            }
+
+            if proto == "TCP" {
+                scan_port(ip, port, timeout_dur, sem).await
+            } else {
+                scan_udp_port(ip, port, timeout_dur, sem).await
+            }
+        });
     }
 
     let mut results: Vec<ScanResult> = Vec::new();
