@@ -57,10 +57,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Some(b) => format!(" | Banner: {}", b),
                     None => "".to_string(),
                 };
+                let os_display = match &result.os {
+                    Some(os) => format!(" | OS: {}", os),
+                    None => "".to_string(),
+                };
 
                 println!(
-                    "[+] {}{}:{} - OPEN{}",
-                    result.ip, host_display, result.port, banner_display
+                    "[+] {}{}:{} - OPEN{}{}",
+                    result.ip, host_display, result.port, banner_display, os_display
                 );
             }
         }

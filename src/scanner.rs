@@ -13,6 +13,7 @@ pub struct ScanResult {
     pub is_open: bool,
     pub hostname: Option<String>,
     pub banner: Option<String>,
+    pub os: Option<String>,
 }
 
 pub async fn scan_port(
@@ -28,6 +29,7 @@ pub async fn scan_port(
         Ok(Ok(mut stream)) => {
             let banner = grab_banner(&mut stream, port).await;
             let hostname = crate::network::lookup_hostname(ip).await;
+            let os = estimate_os(port, banner.as_deref(), &stream);
 
             Some(ScanResult {
                 ip,
@@ -35,6 +37,7 @@ pub async fn scan_port(
                 is_open: true,
                 hostname,
                 banner,
+                os,
             })
         }
         _ => None,
@@ -92,4 +95,27 @@ fn clean_banner(s: &str) -> String {
         .chars()
         .take(120)
         .collect()
+}
+
+pub fn estimate_os(port: u16, banner: Option<&str>, _stream: &TcpStream) -> Option<String> {
+    if let Some(b) = banner {
+        let b_lower = b.to_lowercase();
+        if b_lower.contains("windows") || b_lower.contains("microsoft") || b_lower.contains("iis") {
+            return Some("Windows".to_string());
+        }
+        if b_lower.contains("ubuntu") || b_lower.contains("debian") || b_lower.contains("centos")
+           || b_lower.contains("redhat") || b_lower.contains("linux") || b_lower.contains("openssh") {
+            return Some("Linux / Unix".to_string());
+        }
+        if b_lower.contains("macos") || b_lower.contains("darwin") || b_lower.contains("apple") {
+            return Some("macOS / Apple".to_string());
+        }
+    }
+
+    match port {
+        3389 | 445 | 135 | 139 => Some("Windows".to_string()),
+        22 | 80 | 443 | 21 | 25 => Some("Linux / Unix / Server".to_string()),
+        548 | 631 => Some("macOS / Unix".to_string()),
+        _ => None,
+    }
 }
